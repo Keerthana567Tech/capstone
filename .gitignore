@@ -1,0 +1,17 @@
+# GitHub File Size Limit (> 100 MB files cannot be pushed to GitHub)
+# Raw source files (> 100 MB)
+preprocessed_onion_2014_2024_prices_weather_events.csv
+preprocessed_onion_2014_2024_prices_weather_events.zip
+
+# Cleaned daily dataset (1.37 GB, exceeds GitHub 100 MB limit)
+cleaned_onion_daily.csv
+cleaned_onion_daily.zip
+
+# Uncompressed monthly dataset (112 MB > 100 MB limit; tracked as cleaned_onion_monthly.zip)
+cleaned_onion_monthly.csv
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/

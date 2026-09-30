@@ -1,0 +1,40 @@
+feature_name,data_type,meaning_and_description,role_in_modeling,in_quantum_top_8,in_quantum_top_16
+price_current_month,float64,Monthly average daily modal price (Rs/qtl),Primary baseline market price predictor,Yes,Yes
+price_median_current_month,float64,Monthly median daily modal price (Rs/qtl),Robust central tendency price indicator,Yes,Yes
+price_min_current_month,float64,Monthly minimum modal price recorded,Lower price boundary in trading month,Yes,Yes
+price_max_current_month,float64,Monthly maximum modal price recorded,Upper ceiling price boundary in trading month,Yes,Yes
+price_std_current_month,float64,Standard deviation of daily modal prices in month,Intra-month trading price volatility,No,Yes
+days_reported,float64,Number of active mandi trading days in month,Liquidity and market reporting activity metric,No,No
+price_lag_1,float64,Modal price in month t-1 (previous month),Short-term autoregressive price memory,No,Yes
+price_lag_2,float64,Modal price in month t-2 (two months prior),Medium-term price momentum component,No,No
+price_lag_3,float64,Modal price in month t-3 (quarter prior),Quarterly historical price baseline,No,Yes
+price_lag_6,float64,Modal price in month t-6 (half-year prior),Half-yearly seasonal price baseline,No,Yes
+price_lag_12,float64,Modal price in month t-12 (same month prior year),Annual crop calendar seasonal baseline,No,Yes
+price_rolling_3m_mean,float64,3-month rolling mean modal price,Smoothed short-term price trend,No,No
+price_rolling_6m_mean,float64,6-month rolling mean modal price,Smoothed medium-term price trend,No,No
+price_rolling_12m_mean,float64,12-month rolling mean modal price,Long-term secular price level,No,Yes
+price_rolling_3m_std,float64,3-month rolling standard deviation of price,Quarterly price regime volatility,No,No
+price_change_ratio_1m,float64,Relative price change: (P_t - P_{t-1}) / P_{t-1},Monthly inflation / deflation rate,Yes,Yes
+arrivals_total_current_month,float64,Total mandi onion arrivals in tonnes,Primary market physical supply volume,No,No
+arrivals_daily_avg_current_month,float64,Daily average arrivals in reporting days,Daily supply flow rate,No,No
+arrivals_lag_1,float64,Total arrivals in month t-1,Lagged physical supply volume,No,No
+arrivals_rolling_3m_mean,float64,3-month rolling mean arrivals,Smoothed supply availability indicator,No,No
+arrivals_change_ratio_1m,float64,Relative arrival change: (A_t - A_{t-1}) / A_{t-1},Supply shock / disruption momentum,No,No
+rainfall_total_current_month,float64,Total monthly cumulative rainfall (mm),Immediate weather & harvesting disruption,Yes,Yes
+rainfall_lag_1,float64,Total rainfall in month t-1,Lagged soil moisture & post-harvest storage shock,No,No
+rainfall_rolling_3m_sum,float64,3-month cumulative rainfall (mm),Cumulative monsoon / crop-stage precipitation,No,Yes
+temp_avg_current_month,float64,Monthly average ambient temperature (°C),Thermal stress & storage spoilage driver,No,No
+temp_avg_lag_1,float64,Monthly average temperature in month t-1,Lagged thermal conditions,No,Yes
+temp_rolling_3m_mean,float64,3-month rolling average temperature,Seasonal climatic regime indicator,No,No
+tmax_current_month,float64,Monthly average maximum daily temperature (°C),Extreme daytime thermal peak,No,No
+tmin_current_month,float64,Monthly average minimum daily temperature (°C),Night-time cold exposure temperature,Yes,Yes
+quarter,float64,Calendar quarter of current month (1-4),Macro seasonal quarter,No,No
+sin_month,float64,Sine transform of month index (2*pi*month/12),Cyclical annual calendar encoding,Yes,Yes
+cos_month,float64,Cosine transform of month index (2*pi*month/12),Cyclical annual calendar encoding,No,No
+market_encoded,float64,Frequency encoding of wholesale market node,Market-level trading volume scale,No,No
+district_encoded,float64,Frequency encoding of administrative district,Regional agricultural density representation,No,No
+state_encoded,float64,Frequency encoding of state,Macro state production share representation,No,No
+variety_encoded,float64,Frequency encoding of onion cultivar,Cultivar prevalence & market share,No,No
+crop_season_onion_encoded,float64,Frequency encoding of crop season (Rabi/Kharif),Agricultural crop production cycle encoding,No,No
+target_price_next_month,float64,Monthly average modal price in consecutive month t+1 (Rs/qtl),Supervised Regression Target (P_{t+1}),Target,Target
+sample_weight,float64,Inverse-frequency tier weight for training regression loss,Loss Penalty Weighting (No row distortion),Weight,Weight

@@ -1,0 +1,57 @@
+column_name,original_dtype,missing_count,missing_percentage,unique_values,classification_category,action_decision,technical_rationale
+date,str,0,0.0,4018,Essential,Retained / Aggregated,Retained & converted to monthly year/month calendar index.
+state,str,0,0.0,24,Essential,Retained / Aggregated,Retained; primary administrative region indicator.
+district,str,0,0.0,223,Essential,Retained / Aggregated,Retained; critical local agricultural catchment zone.
+market,str,0,0.0,812,Essential,Retained / Aggregated,Retained; fundamental wholesale terminal trading node.
+variety,str,0,0.0,25,Essential,Retained / Aggregated,"Retained; onion cultivars differ drastically in perishability, size & price."
+group,str,0,0.0,1,Redundant,Dropped / Replaced,"Dropped; single constant value (""Vegetables"") across entire dataset."
+arrivals_tonnes,float64,0,0.0,29344,Essential,Retained / Aggregated,Aggregated into monthly total volume (sum) and daily mean.
+min_price_rs_qtl,float64,0,0.0,3558,Potentially Useful,Retained / Aggregated,Aggregated to monthly minimum price.
+max_price_rs_qtl,float64,0,0.0,5206,Potentially Useful,Retained / Aggregated,Aggregated to monthly maximum price.
+modal_price_rs_qtl,float64,0,0.0,4948,Essential,Retained / Aggregated,Primary target variable basis; aggregated to monthly mean/median.
+year,int64,0,0.0,11,Essential,Retained / Aggregated,Retained; secular long-term trend indicator.
+grade,str,0,0.0,5,Potentially Useful,Retained / Aggregated,"Retained via mode; 98.6% of records are standard ""FAQ""."
+lat,float64,12213,1.27,222,Potentially Useful,Retained / Aggregated,Retained; spatial coordinate for spatial interpolation.
+lon,float64,12213,1.27,222,Potentially Useful,Retained / Aggregated,Retained; spatial coordinate for spatial interpolation.
+grid_lat,float64,12213,1.27,79,Redundant,Dropped / Replaced,Dropped; coarse weather grid coordinates duplicate high-res lat.
+grid_lon,float64,12213,1.27,75,Redundant,Dropped / Replaced,Dropped; coarse weather grid coordinates duplicate high-res lon.
+rain,float64,12906,1.34,110241,Essential,Retained / Aggregated,Aggregated into monthly cumulative rainfall (mm).
+tmax,float64,12213,1.27,308806,Potentially Useful,Retained / Aggregated,Aggregated into monthly mean maximum temperature.
+tmin,float64,12213,1.27,311950,Potentially Useful,Retained / Aggregated,Aggregated into monthly mean minimum temperature.
+market_key,str,0,0.0,818,Redundant,Dropped / Replaced,Dropped; redundant concatenation of state_district_market.
+temp_avg,float64,12218,1.27,314201,Essential,Retained / Aggregated,Aggregated into monthly average ambient temperature (°C).
+month,int64,0,0.0,12,Essential,Retained / Aggregated,Retained; primary monthly seasonal identifier.
+week,int64,0,0.0,53,Redundant,Dropped / Replaced,Dropped; daily/weekly grain superseded by monthly aggregation.
+dayofweek,int64,0,0.0,7,Redundant,Dropped / Replaced,Dropped; intra-week grain irrelevant for monthly price forecasting.
+is_weekend,int64,0,0.0,2,Redundant,Dropped / Replaced,Dropped; daily holiday/weekend trading pattern irrelevant for monthly horizon.
+season,str,0,0.0,4,Potentially Useful,Retained / Aggregated,"Retained via monthly mode (Rabi, Kharif, Summer)."
+modal_price_lag_1,float64,818,0.08,4944,Leakage/Misaligned,Dropped / Replaced,Dropped; daily lag misaligned with future-month prediction. Replaced by monthly lag 1.
+modal_price_pctchg_lag_1,float64,818,0.08,78233,Leakage/Misaligned,Dropped / Replaced,Dropped; replaced by monthly percentage change.
+arrivals_lag_1,float64,818,0.08,29330,Leakage/Misaligned,Dropped / Replaced,Dropped; replaced by monthly arrivals lag 1.
+arrivals_pctchg_lag_1,float64,818,0.08,236260,Leakage/Misaligned,Dropped / Replaced,Dropped; replaced by monthly arrivals pct change.
+modal_price_lag_7,float64,5421,0.56,4923,Leakage/Misaligned,Dropped / Replaced,Dropped; 7-day daily lag irrelevant for 1-month forecast.
+modal_price_pctchg_lag_7,float64,5421,0.56,105699,Leakage/Misaligned,Dropped / Replaced,Dropped; 7-day pct change superseded by monthly lags.
+arrivals_lag_7,float64,5421,0.56,29203,Leakage/Misaligned,Dropped / Replaced,Dropped; 7-day arrivals lag superseded by monthly lags.
+arrivals_pctchg_lag_7,float64,5421,0.56,264031,Leakage/Misaligned,Dropped / Replaced,Dropped; 7-day arrivals pct change superseded by monthly lags.
+modal_price_lag_30,float64,21937,2.27,4809,Leakage/Misaligned,Dropped / Replaced,Dropped; daily 30-day lag replaced by exact monthly lag 1 ($t-1$).
+modal_price_pctchg_lag_30,float64,21937,2.27,132952,Leakage/Misaligned,Dropped / Replaced,Dropped; replaced by 1-month price change ratio.
+arrivals_lag_30,float64,21937,2.27,28735,Leakage/Misaligned,Dropped / Replaced,Dropped; replaced by monthly arrivals lag 1.
+arrivals_pctchg_lag_30,float64,21937,2.27,262385,Leakage/Misaligned,Dropped / Replaced,Dropped; replaced by monthly arrivals change ratio.
+modal_price_7d_mean,float64,818,0.08,25780,Leakage/Misaligned,Dropped / Replaced,Dropped; daily 7-day mean superseded by monthly price.
+arrivals_7d_mean,float64,818,0.08,107534,Leakage/Misaligned,Dropped / Replaced,Dropped; daily 7-day mean superseded by monthly arrivals.
+modal_price_30d_mean,float64,818,0.08,76691,Leakage/Misaligned,Dropped / Replaced,Dropped; daily 30-day mean replaced by exact monthly mean.
+arrivals_30d_mean,float64,818,0.08,210794,Leakage/Misaligned,Dropped / Replaced,Dropped; daily 30-day mean replaced by monthly total arrivals.
+price_spike,int64,0,0.0,2,Redundant,Dropped / Replaced,Dropped; daily spike flag derived from target; monthly target reflects level.
+arrival_zero,int64,0,0.0,1,Redundant,Dropped / Replaced,Dropped; constant zero column.
+avg_temp_avg_5m,float64,405803,42.04,532126,Unnecessary,Dropped / Replaced,Dropped; 42.0% missing; reconstructed directly via clean monthly rolling means.
+avg_tmax_5m,float64,405803,42.04,532126,Unnecessary,Dropped / Replaced,Dropped; 42.0% missing; reconstructed via monthly temperature rolling features.
+avg_tmin_5m,float64,405803,42.04,532129,Unnecessary,Dropped / Replaced,Dropped; 42.0% missing; reconstructed via monthly temperature rolling features.
+avg_rain_5m,float64,406023,42.06,332673,Unnecessary,Dropped / Replaced,Dropped; 42.1% missing; reconstructed via monthly rolling cumulative rain.
+cum_rain_5m,float64,398510,41.28,270174,Unnecessary,Dropped / Replaced,Dropped; 41.3% missing; replaced with 3-month and 6-month monthly cumulative rain.
+temp_avg_expanding_mean,float64,12435,1.29,952632,Leakage/Misaligned,Dropped / Replaced,Dropped; global expanding mean calculated across future time horizons introduces lookahead bias.
+temp_avg_district_mean,float64,12435,1.29,952632,Redundant,Dropped / Replaced,Dropped; redundant with monthly mean ambient temperature.
+temp_avg_anomaly,float64,12440,1.29,952822,Redundant,Dropped / Replaced,Dropped; redundant with monthly rolling temperature deviations.
+cum_rain_ytd,float64,0,0.0,254902,Redundant,Dropped / Replaced,Dropped; annual cumulative rain reset replaced with continuous rolling rainfall.
+festival_name,str,926587,95.99,22,Unnecessary,Dropped / Replaced,Dropped; 96.0% missing values; seasonal effects captured by calendar month.
+is_festival,bool,0,0.0,2,Potentially Useful,Retained / Aggregated,Aggregated into monthly festival count/presence indicator.
+crop_season_onion,str,0,0.0,3,Essential,Retained / Aggregated,"Retained via monthly mode (Kharif, Late Kharif, Rabi)."
