@@ -1,5 +1,5 @@
 column_name,original_dtype,missing_count,missing_percentage,unique_values,classification_category,action_decision,technical_rationale
-date,datetime64[us],0,0.0,4018,Essential,Retained / Aggregated,Retained and converted to monthly calendar index.
+date,str,0,0.0,4018,Essential,Retained / Aggregated,Retained and converted to monthly calendar index.
 state,str,0,0.0,24,Essential,Retained / Aggregated,Retained as primary administrative region indicator.
 district,str,0,0.0,223,Essential,Retained / Aggregated,Retained as local agricultural district indicator.
 market,str,0,0.0,812,Essential,Retained / Aggregated,Retained as wholesale market trading node indicator.
@@ -8,8 +8,8 @@ group,str,0,0.0,1,Redundant,Dropped / Replaced,Dropped; single constant value ac
 arrivals_tonnes,float64,0,0.0,29344,Essential,Retained / Aggregated,Aggregated into monthly total and daily mean arrival volumes.
 min_price_rs_qtl,float64,0,0.0,3558,Potentially Useful,Retained / Aggregated,Aggregated to monthly minimum price.
 max_price_rs_qtl,float64,0,0.0,5206,Potentially Useful,Retained / Aggregated,Aggregated to monthly maximum price.
-modal_price_rs_qtl,float64,0,0.0,4956,Essential,Retained / Aggregated,Primary market price basis; aggregated to monthly statistics.
-year,int32,0,0.0,11,Essential,Retained / Aggregated,Retained as long-term trend indicator.
+modal_price_rs_qtl,float64,0,0.0,4948,Essential,Retained / Aggregated,Primary market price basis; aggregated to monthly statistics.
+year,int64,0,0.0,11,Essential,Retained / Aggregated,Retained as long-term trend indicator.
 grade,str,0,0.0,5,Potentially Useful,Retained / Aggregated,"Retained via mode; 98.6% of records are standard ""FAQ""."
 lat,float64,12213,1.27,222,Potentially Useful,Retained / Aggregated,Retained as spatial coordinate.
 lon,float64,12213,1.27,222,Potentially Useful,Retained / Aggregated,Retained as spatial coordinate.
@@ -20,7 +20,7 @@ tmax,float64,12213,1.27,308806,Potentially Useful,Retained / Aggregated,Aggregat
 tmin,float64,12213,1.27,311950,Potentially Useful,Retained / Aggregated,Aggregated into monthly mean minimum temperature.
 market_key,str,0,0.0,818,Redundant,Dropped / Replaced,"Dropped; redundant concatenation of state, district, and market."
 temp_avg,float64,12218,1.27,314201,Essential,Retained / Aggregated,Aggregated into monthly mean temperature (°C).
-month,int32,0,0.0,12,Essential,Retained / Aggregated,Retained as annual seasonal calendar identifier.
+month,int64,0,0.0,12,Essential,Retained / Aggregated,Retained as annual seasonal calendar identifier.
 week,int64,0,0.0,53,Redundant,Dropped / Replaced,Dropped; daily/weekly resolution replaced by monthly aggregation.
 dayofweek,int64,0,0.0,7,Redundant,Dropped / Replaced,Dropped; intra-week resolution not applicable for monthly horizon.
 is_weekend,int64,0,0.0,2,Redundant,Dropped / Replaced,Dropped; intra-week pattern not applicable for monthly horizon.

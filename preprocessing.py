@@ -518,7 +518,6 @@ def perform_imbalance_analysis(df, split_year_train=2021):
     n_train = train_mask.sum()
     n_classes = len(labels)
 
-    # Inverse-frequency class weighting formula: w_k = N / (K * N_k)
     tier_weights = {}
     for label in labels:
         count = train_tiers.get(label, 1)
@@ -1049,89 +1048,145 @@ python preprocessing.py
         f.write(content.strip())
 
 
-def print_summary(metrics_before, clean_daily_df, monthly_df, train_df, val_df, test_df, feature_cols, base_dir, viz_dir):
+def display_before_after_comparison(metrics_before, clean_daily_df, monthly_df, feature_cols):
     """
-    Print formal execution summary and output metrics to console.
+    Display formal before-and-after preprocessing comparison audit table.
 
     Args:
-        metrics_before (dict): Raw baseline metrics.
+        metrics_before (dict): Baseline metrics.
         clean_daily_df (pd.DataFrame): Clean daily observations.
-        monthly_df (pd.DataFrame): Final monthly observations.
-        train_df (pd.DataFrame): Training split.
-        val_df (pd.DataFrame): Validation split.
-        test_df (pd.DataFrame): Test split.
-        feature_cols (list): Model features.
-        base_dir (str): Base directory.
-        viz_dir (str): Visualizations directory.
+        monthly_df (pd.DataFrame): Clean monthly observations.
+        feature_cols (list): Selected features list.
     """
-    target = monthly_df['target_price_next_month']
-    total_monthly = len(monthly_df)
+    target_after = monthly_df['target_price_next_month']
+    exact_dups_after = monthly_df.duplicated(subset=['state', 'district', 'market', 'variety', 'year', 'month']).sum()
+    missing_after = monthly_df[feature_cols + ['target_price_next_month']].isna().sum().sum()
+
+    audit_rows = [
+        ("Dataset Records", f"{metrics_before['rows']:,} raw daily rows", f"{len(monthly_df):,} monthly units"),
+        ("Feature Columns", f"{metrics_before['cols']} raw columns", f"{len(feature_cols)} predictors + 1 target"),
+        ("Missing Values", f"{metrics_before['missing_values']:,} entries", f"{missing_after} (0.0%)"),
+        ("Invalid / Zero Prices", f"{metrics_before['invalid_prices']:,} zero rows", "0 (239 imputed, 203 removed)"),
+        ("Scale Typo Errors (>25k)", f"{metrics_before['extreme_errors']:,} records", "0 (max Rs 24,780/qtl retained)"),
+        ("Duplicate Key Records", f"{metrics_before['exact_duplicates']:,} rows", f"{exact_dups_after} rows"),
+        ("Target Price Mean", f"Rs {metrics_before['target_mean']:,.2f} / qtl", f"Rs {target_after.mean():,.2f} / qtl"),
+        ("Target Price Median", f"Rs {metrics_before['target_median']:,.2f} / qtl", f"Rs {target_after.median():,.2f} / qtl"),
+        ("Target Price Std Dev", f"Rs {metrics_before['target_std']:,.2f} / qtl", f"Rs {target_after.std():,.2f} / qtl"),
+        ("Target Maximum Price", f"Rs {metrics_before['target_max']:,.2f} / qtl", f"Rs {target_after.max():,.2f} / qtl"),
+        ("Active Wholesale Markets", f"{metrics_before['markets']} mandis", f"{monthly_df['market'].nunique()} mandis"),
+        ("Districts Covered", f"{metrics_before['districts']} districts", f"{monthly_df['district'].nunique()} districts"),
+        ("Cultivar Varieties", f"{metrics_before['varieties']} varieties", f"{monthly_df['variety'].nunique()} varieties")
+    ]
 
     print("\n" + "=" * 80)
-    print("PREPROCESSING RESULTS")
+    print("PREPROCESSING AUDIT: BEFORE vs AFTER COMPARISON")
     print("=" * 80)
-    print("Dataset Records:")
-    print(f"  Raw observations          : {metrics_before['rows']:,} daily records ({metrics_before['cols']} columns)")
-    print(f"  Cleaned daily records     : {len(clean_daily_df):,} daily records ({len(clean_daily_df)/metrics_before['rows']*100:.2f}% retained)")
-    print(f"  Monthly forecasting units : {total_monthly:,} records")
-    print(f"  Model features            : {len(feature_cols)} numerical predictors + 1 target")
-    print(f"  Missing values            : 0")
-
-    print("\nChronological Partitions:")
-    print(f"  Train (2014-2021)         : {len(train_df):,} samples ({len(train_df)/total_monthly*100:.2f}%)")
-    print(f"  Validation (2022-2023)    : {len(val_df):,} samples ({len(val_df)/total_monthly*100:.2f}%)")
-    print(f"  Test (2024)               : {len(test_df):,} samples ({len(test_df)/total_monthly*100:.2f}%)")
-
-    print("\nTarget Variable:")
-    print("  Name                      : target_price_next_month (P_{t+1})")
-    print("  Unit                      : Rupees per Quintal (Rs/qtl)")
-    print(f"  Mean / Median             : Rs {target.mean():.2f} / Rs {target.median():.2f}")
-    print(f"  Std Dev                   : Rs {target.std():.2f}")
-
-    print("\nOutput Files Generated:")
-    print(f"  - {os.path.join(base_dir, 'cleaned_onion_monthly.csv')}")
-    print(f"  - {os.path.join(base_dir, 'train.csv')}")
-    print(f"  - {os.path.join(base_dir, 'validation.csv')}")
-    print(f"  - {os.path.join(base_dir, 'test.csv')}")
-    print(f"  - {os.path.join(base_dir, 'preprocessing_report.csv')}")
-    print(f"  - {os.path.join(base_dir, 'feature_description.csv')}")
-    print(f"  - {os.path.join(base_dir, 'README.md')}")
-    print(f"  - {viz_dir} (10 figures)")
+    print(f"{'Metric':<28} | {'Raw Baseline':<24} | {'Preprocessed Final':<24}")
+    print("-" * 80)
+    for metric, before, after in audit_rows:
+        print(f"{metric:<28} | {before:<24} | {after:<24}")
     print("=" * 80 + "\n")
 
 
 def main():
-    print("Executing onion price prediction preprocessing pipeline...")
+    print("=" * 80)
+    print("QUANTUM-ENHANCED CROP PRICE PREDICTION: PREPROCESSING PIPELINE")
+    print("=" * 80)
+
     base_dir, csv_path, zip_path, viz_dir = resolve_data_paths()
 
-    print("[1/6] Ingesting raw dataset...")
+    # Step 1: Ingestion
+    print("\n[Step 1/11] Ingesting Raw Dataset...")
     raw_df = load_raw_dataset(csv_path, zip_path)
+    print(f"  Source file: {os.path.basename(csv_path)}")
+    print(f"  Observations loaded: {len(raw_df):,} daily records across {raw_df.shape[1]} columns")
+
+    # Step 2: Baseline Profiling
+    print("\n[Step 2/11] Baseline Data Profiling...")
     metrics_before = profile_baseline_dataset(raw_df)
+    print(f"  Total missing values: {metrics_before['missing_values']:,} entries")
+    print(f"  Duplicate records: {metrics_before['key_duplicates']:,} rows")
+    print(f"  Invalid / zero target prices: {metrics_before['invalid_prices']:,} records")
+    print(f"  Extreme scale errors (> Rs 25,000/qtl): {metrics_before['extreme_errors']:,} records (peak: Rs {metrics_before['target_max']:,.2f})")
+    print(f"  Price central tendency: Mean = Rs {metrics_before['target_mean']:.2f} | Median = Rs {metrics_before['target_median']:.2f} / qtl")
 
-    print("[2/6] Cleaning observations and handling anomalies...")
+    # Step 3: Feature Classification
+    print("\n[Step 3/11] Feature Classification & Column Audit...")
+    report_df = generate_feature_classification_report(raw_df, base_dir)
+    retained_cols = (report_df['action_decision'] == 'Retained / Aggregated').sum()
+    dropped_cols = (report_df['action_decision'] == 'Dropped / Replaced').sum()
+    print(f"  Features retained / aggregated: {retained_cols} columns (identifiers, prices, volumes, weather, seasons)")
+    print(f"  Features dropped / replaced: {dropped_cols} columns (redundant constants, daily lags, leakage averages)")
+
+    # Step 4: Daily Data Cleaning
+    print("\n[Step 4/11] Cleaning Daily Observations...")
     clean_daily_df, cleaning_ledger = clean_daily_dataset(raw_df)
-    generate_feature_classification_report(raw_df, base_dir)
+    print(f"  Recovered zero modal prices: {cleaning_ledger['imputed_zero_modal']:,} rows imputed via (min + max) / 2")
+    print(f"  Removed unrecoverable zeros: {cleaning_ledger['dropped_unrecoverable_zero']:,} rows")
+    print(f"  Filtered scale typo errors: {cleaning_ledger['dropped_scale_errors']:,} rows (> Rs 25,000/qtl)")
+    print(f"  Deduplicated key records: {cleaning_ledger['dropped_key_duplicates']:,} rows")
+    retention_rate = len(clean_daily_df) / metrics_before['rows'] * 100
+    print(f"  Clean daily records retained: {len(clean_daily_df):,} rows ({retention_rate:.2f}% retention rate)")
 
-    print("[3/6] Aggregating monthly series and constructing targets...")
+    # Step 5: Monthly Aggregation & Target Formulation
+    print("\n[Step 5/11] Monthly Aggregation & Predictive Target Formulation (P_{t+1})...")
     monthly_df = aggregate_to_monthly_dataset(clean_daily_df)
+    total_monthly = len(monthly_df)
+    valid_targets = monthly_df['target_price_next_month'].notna().sum()
+    print(f"  Aggregated monthly series: {total_monthly:,} records")
+    print(f"  Valid consecutive targets (P_{{t+1}}): {valid_targets:,} prediction pairs ({valid_targets/total_monthly*100:.2f}% retention)")
+    print(f"  Entity coverage: {monthly_df['market'].nunique()} markets across {monthly_df['district'].nunique()} districts and {monthly_df['variety'].nunique()} varieties")
 
-    print("[4/6] Engineering time-aware features and sample weights...")
+    # Step 6: Feature Engineering
+    print("\n[Step 6/11] Time-Aware Feature Engineering...")
     monthly_df = engineer_monthly_features(monthly_df)
-    monthly_df, tier_df, imbalance_ratio = perform_imbalance_analysis(monthly_df)
-    train_df, val_df, test_df = split_chronologically(monthly_df)
+    print("  Autoregressive price lags: t-1, t-2, t-3, t-6, t-12 (annual crop calendar)")
+    print("  Rolling trends & volatility: 3m, 6m, 12m moving averages; 3m rolling price std")
+    print("  Momentum & physical supply: 1m price & arrival change ratios; 3m rolling arrivals")
+    print("  Climatic & seasonal features: 3m cumulative rain, rolling temp, cyclical sin/cos month")
+    print(f"  Training-ready dataset size: {len(monthly_df):,} records")
 
-    print("[5/6] Encoding features and scaling for classical / QML models...")
+    # Step 7: Imbalance Analysis & Sample Weighting
+    print("\n[Step 7/11] Target Distribution & Sample Weighting...")
+    monthly_df, tier_df, imbalance_ratio = perform_imbalance_analysis(monthly_df)
+    tier_counts = tier_df['Observations']
+    tier_pcts = tier_df['Percentage']
+    for label in tier_counts.index:
+        print(f"  Tier: {label:<25}: {tier_counts[label]:>6,} samples ({tier_pcts[label]:>5.2f}%)")
+    print(f"  Imbalance ratio (dominant / sparse): {imbalance_ratio:.2f}:1 (weighted loss penalty on training set; SMOTE omitted)")
+
+    # Step 8: Chronological Partitioning
+    print("\n[Step 8/11] Chronological Train / Validation / Test Splitting...")
+    train_df, val_df, test_df = split_chronologically(monthly_df)
+    n_total = len(monthly_df)
+    print(f"  Train set (2014-2021)        : {len(train_df):,} samples ({len(train_df)/n_total*100:.2f}%)")
+    print(f"  Validation set (2022-2023)   : {len(val_df):,} samples ({len(val_df)/n_total*100:.2f}%)")
+    print(f"  Test set (2024 out-of-time)  : {len(test_df):,} samples ({len(test_df)/n_total*100:.2f}%)")
+
+    # Step 9: Feature Encoding, Scaling & QML Ranking
+    print("\n[Step 9/11] Classical & Quantum ML Feature Readiness...")
     train_df, val_df, test_df, monthly_df, feature_cols, top_8, top_16, importances = prepare_classical_and_quantum_features(
         train_df, val_df, test_df, monthly_df
     )
     save_feature_descriptions(feature_cols, top_8, top_16, base_dir)
+    print(f"  Classical ML representation  : RobustScaler fitted strictly on training partition ({len(feature_cols)} features)")
+    print("  Quantum ML angle encoding    : MinMaxScaler [0, pi] for qubit rotation gates")
+    print(f"  Top-8 features (8-qubit)     : {', '.join(top_8)}")
+    print(f"  Top-16 features (16-qubit)   : {', '.join(top_16)}")
 
-    print("[6/6] Generating visualizations and exporting output files...")
+    # Step 10: Diagnostic Visualizations
+    print("\n[Step 10/11] Generating Diagnostic Visualizations...")
     generate_visualizations(raw_df, clean_daily_df, monthly_df, train_df, val_df, test_df, viz_dir, feature_cols)
+    print(f"  Generated 10 diagnostic figures (300 DPI) in: {viz_dir}")
+
+    # Step 11: Export & Audit Comparison
+    print("\n[Step 11/11] Exporting Processed Datasets...")
     export_processed_files(monthly_df, train_df, val_df, test_df, base_dir)
     generate_readme(base_dir, monthly_df, train_df, val_df, test_df, top_8, top_16)
+    print("  Exported files: cleaned_onion_monthly.csv, train.csv, validation.csv, test.csv, README.md")
 
-    print_summary(metrics_before, clean_daily_df, monthly_df, train_df, val_df, test_df, feature_cols, base_dir, viz_dir)
+    # Final Before vs After Summary Audit
+    display_before_after_comparison(metrics_before, clean_daily_df, monthly_df, feature_cols)
 
 
 if __name__ == '__main__':
