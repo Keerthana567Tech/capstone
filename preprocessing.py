@@ -61,32 +61,22 @@ def load_raw_dataset(csv_path, zip_path):
     Returns:
         pd.DataFrame: Loaded raw dataset.
     """
-    print("\n" + "=" * 80)
-    print("STEP 1: INGESTING RAW DATASET")
-    print("=" * 80)
-
     df = None
     if os.path.exists(csv_path):
         try:
-            print(f"Loading CSV from: {csv_path}")
             df = pd.read_csv(csv_path, low_memory=False)
-            print("Successfully loaded CSV file.")
-        except (PermissionError, Exception) as e:
-            print(f"Notice: Direct CSV access raised {type(e).__name__} ({e}).")
+        except (PermissionError, Exception):
             df = None
 
     if df is None and os.path.exists(zip_path):
-        print(f"Reading from ZIP archive: {zip_path}")
         with zipfile.ZipFile(zip_path, 'r') as z:
             csv_in_zip = [f for f in z.namelist() if f.endswith('.csv')][0]
             with z.open(csv_in_zip) as f_in:
                 df = pd.read_csv(f_in, low_memory=False)
-        print("Successfully loaded dataset from ZIP archive.")
 
     if df is None:
         raise FileNotFoundError(f"Could not locate dataset in {csv_path} or {zip_path}.")
 
-    print(f"Dataset Ingested: {df.shape[0]:,} records, {df.shape[1]} columns.")
     return df
 
 
@@ -100,16 +90,11 @@ def profile_baseline_dataset(df):
     Returns:
         dict: Baseline profiling metrics.
     """
-    print("\n" + "=" * 80)
-    print("STEP 2: BASELINE DATASET PROFILING")
-    print("=" * 80)
-
     raw_rows, raw_cols = df.shape
     target_col = 'modal_price_rs_qtl'
 
     missing_series = df.isna().sum()
     total_missing = missing_series.sum()
-    missing_cols = missing_series[missing_series > 0].sort_values(ascending=False)
 
     exact_duplicates = df.duplicated().sum()
     key_cols = ['date', 'market', 'variety', 'grade']
@@ -119,9 +104,6 @@ def profile_baseline_dataset(df):
     zero_prices = (target_series == 0).sum()
     neg_prices = (target_series < 0).sum()
 
-    inconsistent_min = (df['min_price_rs_qtl'] > df[target_col]).sum()
-    inconsistent_max = (df[target_col] > df['max_price_rs_qtl']).sum()
-
     q25 = target_series.quantile(0.25)
     q50 = target_series.median()
     q75 = target_series.quantile(0.75)
@@ -129,57 +111,16 @@ def profile_baseline_dataset(df):
     iqr_lower = q25 - 1.5 * iqr
     iqr_upper = q75 + 1.5 * iqr
     outliers_iqr = ((target_series < iqr_lower) | (target_series > iqr_upper)).sum()
-    extreme_outliers = (target_series > (q75 + 3.0 * iqr)).sum()
     extreme_scale_errors = (target_series > 25000).sum()
 
     num_states = df['state'].nunique()
     num_districts = df['district'].nunique()
     num_markets = df['market'].nunique()
     num_varieties = df['variety'].nunique()
-    num_grades = df['grade'].nunique()
-
-    dates = pd.to_datetime(df['date'])
-    min_date, max_date = dates.min(), dates.max()
-    unique_dates = dates.nunique()
 
     price_bins = [-np.inf, 1000, 2500, 5000, 10000, np.inf]
     bin_labels = ['Low (<1000)', 'Normal (1000-2500)', 'Moderate High (2500-5000)', 'High (5000-10000)', 'Spike (>10000)']
     raw_binned = pd.cut(target_series, bins=price_bins, labels=bin_labels).value_counts(sort=False)
-
-    print("\n--- A. SUMMARY PROFILE BEFORE PREPROCESSING ---")
-    print(f"Total Rows                  : {raw_rows:,}")
-    print(f"Total Columns               : {raw_cols}")
-    print(f"Exact Duplicate Rows        : {exact_duplicates:,} ({exact_duplicates/raw_rows*100:.3f}%)")
-    print(f"Key Duplicates (date/mkt/var): {key_duplicates:,}")
-    print(f"Total Missing Values        : {total_missing:,}")
-    print(f"Zero Target Prices          : {zero_prices:,}")
-    print(f"Negative Target Prices      : {neg_prices:,}")
-    print(f"Target Modal > Max Inconsist: {inconsistent_max:,} (mostly max_price=0 entry)")
-    print(f"Target Min > Modal Inconsist: {inconsistent_min:,}")
-    print(f"Target Price Mean           : Rs {target_series.mean():.2f}/qtl")
-    print(f"Target Price Median         : Rs {q50:.2f}/qtl")
-    print(f"Target Price Std Dev        : Rs {target_series.std():.2f}/qtl")
-    print(f"Target Price Min - Max      : Rs {target_series.min():.2f} - Rs {target_series.max():.2f}/qtl")
-    print(f"Target Price IQR Bounds     : [{iqr_lower:.2f}, {iqr_upper:.2f}]")
-    print(f"Target IQR Outliers (1.5x)  : {outliers_iqr:,} ({outliers_iqr/raw_rows*100:.2f}%)")
-    print(f"Extreme Outliers (>3x IQR)  : {extreme_outliers:,} ({extreme_outliers/raw_rows*100:.2f}%)")
-    print(f"Severe Scale Errors (>25k)  : {extreme_scale_errors:,}")
-    print(f"Temporal Coverage           : {min_date.strftime('%Y-%m-%d')} to {max_date.strftime('%Y-%m-%d')} ({unique_dates:,} dates)")
-    print(f"Entities                    : {num_states} States | {num_districts} Districts | {num_markets} Markets | {num_varieties} Varieties")
-
-    print("\n--- B. TOP 10 COLUMNS BY MISSING VALUES ---")
-    top_missing_df = pd.DataFrame({
-        'Missing_Count': missing_cols.head(10),
-        'Percentage': (missing_cols.head(10) / raw_rows * 100).round(2)
-    })
-    print(top_missing_df.to_string())
-
-    print("\n--- C. TARGET PRICE DISTRIBUTION ACROSS AGRICULTURAL TIERS ---")
-    raw_bin_df = pd.DataFrame({
-        'Observation_Count': raw_binned,
-        'Percentage': (raw_binned / raw_rows * 100).round(2)
-    })
-    print(raw_bin_df.to_string())
 
     metrics_before = {
         'rows': raw_rows,
@@ -217,10 +158,6 @@ def generate_feature_classification_report(df, base_dir):
     Returns:
         pd.DataFrame: Feature classification report.
     """
-    print("\n" + "=" * 80)
-    print("STEP 3: FEATURE CLASSIFICATION & QUALITY REPORT")
-    print("=" * 80)
-
     report_rows = []
 
     classification_rules = {
@@ -306,13 +243,6 @@ def generate_feature_classification_report(df, base_dir):
     report_df = pd.DataFrame(report_rows)
     report_path = os.path.join(base_dir, "preprocessing_report.csv")
     report_df.to_csv(report_path, index=False)
-    print(f"Feature classification report saved: {report_path}")
-
-    cat_summary = report_df['classification_category'].value_counts()
-    print("\nFeature Classification Summary (56 Columns):")
-    for cat, count in cat_summary.items():
-        print(f"  - {cat:<22}: {count:>2} columns")
-
     return report_df
 
 
@@ -333,10 +263,6 @@ def clean_daily_dataset(df):
     Returns:
         tuple: (pd.DataFrame, dict) Cleaned dataframe and processing audit counts.
     """
-    print("\n" + "=" * 80)
-    print("STEP 4: CLEANING DAILY RECORDS")
-    print("=" * 80)
-
     initial_count = len(df)
     cleaning_ledger = {
         'initial_rows': initial_count,
@@ -361,20 +287,17 @@ def clean_daily_dataset(df):
         df.loc[zero_modal_cond, 'min_price_rs_qtl'] + df.loc[zero_modal_cond, 'max_price_rs_qtl']
     ) / 2.0
     cleaning_ledger['imputed_zero_modal'] = int(impute_count)
-    print(f"Imputed zero modal prices: {impute_count:,} records.")
 
     invalid_price_cond = df['modal_price_rs_qtl'] <= 0
     dropped_zero_count = invalid_price_cond.sum()
     df = df[~invalid_price_cond].copy()
     cleaning_ledger['dropped_unrecoverable_zero'] = int(dropped_zero_count)
-    print(f"Removed zero/negative target prices: {dropped_zero_count:,} records.")
 
     # Values exceeding 25,000 Rs/qtl represent unit reporting scale errors (e.g. per-tonne rates logged as per-quintal).
     scale_error_cond = df['modal_price_rs_qtl'] > 25000
     dropped_scale_count = scale_error_cond.sum()
     df = df[~scale_error_cond].copy()
     cleaning_ledger['dropped_scale_errors'] = int(dropped_scale_count)
-    print(f"Removed scale reporting errors (> Rs 25,000/qtl): {dropped_scale_count:,} records.")
 
     key_cols = ['date', 'market', 'variety', 'grade']
     before_dedup = len(df)
@@ -382,13 +305,8 @@ def clean_daily_dataset(df):
     df = df.drop_duplicates(subset=key_cols, keep='last')
     dropped_dups = before_dedup - len(df)
     cleaning_ledger['dropped_key_duplicates'] = int(dropped_dups)
-    print(f"Removed key duplicate records: {dropped_dups:,} records.")
 
     cleaning_ledger['final_clean_daily_rows'] = len(df)
-    total_removed = initial_count - len(df)
-    retention_pct = len(df) / initial_count * 100
-
-    print(f"\nCleaning Summary: Retained {len(df):,} of {initial_count:,} records ({retention_pct:.2f}% retained, {total_removed:,} removed).")
     return df, cleaning_ledger
 
 
@@ -405,10 +323,6 @@ def aggregate_to_monthly_dataset(df):
     Returns:
         pd.DataFrame: Monthly aggregated dataframe.
     """
-    print("\n" + "=" * 80)
-    print("STEP 5: MONTHLY AGGREGATION & TARGET CONSTRUCTION")
-    print("=" * 80)
-
     group_cols = ['state', 'district', 'market', 'variety', 'year', 'month']
 
     agg_rules = {
@@ -424,7 +338,6 @@ def aggregate_to_monthly_dataset(df):
         'lon': 'first'
     }
 
-    print("Aggregating daily records by market, variety, and month...")
     m_df = df.groupby(group_cols).agg(agg_rules)
 
     flattened_cols = []
@@ -489,11 +402,6 @@ def aggregate_to_monthly_dataset(df):
     m_df = m_df.merge(target_lookup, left_on=['series_id', 'month_id'], right_on=['series_id', 'match_id'], how='left')
     m_df = m_df.drop(columns=['match_id'])
 
-    initial_monthly = len(m_df)
-    valid_targets = m_df['target_price_next_month'].notna().sum()
-    print(f"Monthly Records Aggregated: {initial_monthly:,}")
-    print(f"Records with Valid Consecutive Target Month (t+1): {valid_targets:,} ({valid_targets/initial_monthly*100:.2f}%)")
-
     return m_df
 
 
@@ -515,10 +423,6 @@ def engineer_monthly_features(m_df):
     Returns:
         pd.DataFrame: Feature-engineered dataframe with valid target rows.
     """
-    print("\n" + "=" * 80)
-    print("STEP 6: TIME-AWARE FEATURE ENGINEERING")
-    print("=" * 80)
-
     def add_lag_feature(df, value_col, lag_months, new_col_name):
         lookup = df[['series_id', 'month_id', value_col]].copy()
         lookup['match_id'] = lookup['month_id'] + lag_months
@@ -526,14 +430,12 @@ def engineer_monthly_features(m_df):
         df = df.merge(lookup, left_on=['series_id', 'month_id'], right_on=['series_id', 'match_id'], how='left')
         return df.drop(columns=['match_id'])
 
-    print("Computing historical price lags (t-1, t-2, t-3, t-6, t-12)...")
     m_df = add_lag_feature(m_df, 'price_current_month', 1, 'price_lag_1')
     m_df = add_lag_feature(m_df, 'price_current_month', 2, 'price_lag_2')
     m_df = add_lag_feature(m_df, 'price_current_month', 3, 'price_lag_3')
     m_df = add_lag_feature(m_df, 'price_current_month', 6, 'price_lag_6')
     m_df = add_lag_feature(m_df, 'price_current_month', 12, 'price_lag_12')
 
-    print("Computing historical arrival and weather lags...")
     m_df = add_lag_feature(m_df, 'arrivals_total_current_month', 1, 'arrivals_lag_1')
     m_df = add_lag_feature(m_df, 'rainfall_total_current_month', 1, 'rainfall_lag_1')
     m_df = add_lag_feature(m_df, 'temp_avg_current_month', 1, 'temp_avg_lag_1')
@@ -548,7 +450,6 @@ def engineer_monthly_features(m_df):
     m_df['rainfall_lag_1'] = m_df['rainfall_lag_1'].fillna(m_df['rainfall_total_current_month'])
     m_df['temp_avg_lag_1'] = m_df['temp_avg_lag_1'].fillna(m_df['temp_avg_current_month'])
 
-    print("Computing rolling window features (3m, 6m, 12m)...")
     m_df['price_rolling_3m_mean'] = (m_df['price_current_month'] + m_df['price_lag_1'] + m_df['price_lag_2']) / 3.0
     m_df['price_rolling_6m_mean'] = (
         m_df['price_current_month'] + m_df['price_lag_1'] + m_df['price_lag_2'] +
@@ -570,7 +471,6 @@ def engineer_monthly_features(m_df):
     m_df['rainfall_rolling_3m_sum'] = m_df['rainfall_total_current_month'] + m_df['rainfall_lag_1']
     m_df['temp_rolling_3m_mean'] = (m_df['temp_avg_current_month'] + m_df['temp_avg_lag_1']) / 2.0
 
-    print("Computing cyclical calendar features...")
     m_df['quarter'] = ((m_df['month'] - 1) // 3) + 1
     m_df['sin_month'] = np.sin(2.0 * np.pi * m_df['month'] / 12.0)
     m_df['cos_month'] = np.cos(2.0 * np.pi * m_df['month'] / 12.0)
@@ -579,7 +479,6 @@ def engineer_monthly_features(m_df):
     final_m_df['target_year'] = final_m_df['target_year'].astype(int)
     final_m_df['target_month'] = final_m_df['target_month'].astype(int)
 
-    print(f"Feature Engineering Complete. Dataset Size: {len(final_m_df):,} rows.")
     return final_m_df
 
 
@@ -599,10 +498,6 @@ def perform_imbalance_analysis(df, split_year_train=2021):
         tuple: (pd.DataFrame, pd.DataFrame, float) Dataframe with sample_weight,
                tier distribution table, and imbalance ratio.
     """
-    print("\n" + "=" * 80)
-    print("STEP 7: TARGET DISTRIBUTION ANALYSIS & SAMPLE WEIGHTING")
-    print("=" * 80)
-
     target = df['target_price_next_month']
 
     bins = [-np.inf, 1000, 2500, 5000, np.inf]
@@ -613,13 +508,10 @@ def perform_imbalance_analysis(df, split_year_train=2021):
     tier_pcts = (tier_counts / len(df) * 100).round(2)
     imbalance_ratio = tier_counts.max() / tier_counts.min()
 
-    print("\nTarget Price Distribution Across Agricultural Tiers:")
     tier_df = pd.DataFrame({
         'Observations': tier_counts,
         'Percentage': tier_pcts
     })
-    print(tier_df.to_string())
-    print(f"\nImbalance Ratio (Dominant vs Sparse Tier): {imbalance_ratio:.2f}:1")
 
     train_mask = df['year'] <= split_year_train
     train_tiers = df.loc[train_mask, 'price_tier'].value_counts()
@@ -637,11 +529,6 @@ def perform_imbalance_analysis(df, split_year_train=2021):
 
     train_w_mean = df.loc[train_mask, 'sample_weight'].mean()
     df.loc[train_mask, 'sample_weight'] /= train_w_mean
-
-    print("\nTraining Set Sample Weights by Tier:")
-    for label in labels:
-        w_val = tier_weights[label] / train_w_mean
-        print(f"  - {label:<25}: Weight = {w_val:.3f}")
 
     return df, tier_df, imbalance_ratio
 
@@ -661,19 +548,9 @@ def split_chronologically(df):
     Returns:
         tuple: (pd.DataFrame, pd.DataFrame, pd.DataFrame) train, val, test splits.
     """
-    print("\n" + "=" * 80)
-    print("STEP 8: CHRONOLOGICAL TRAIN / VALIDATION / TEST SPLIT")
-    print("=" * 80)
-
     train_df = df[df['year'] <= 2021].copy()
     val_df = df[(df['year'] >= 2022) & (df['year'] <= 2023)].copy()
     test_df = df[df['year'] == 2024].copy()
-
-    total = len(df)
-    print(f"Train Set (2014-2021)     : {len(train_df):,} records ({len(train_df)/total*100:.2f}%)")
-    print(f"Validation Set (2022-2023): {len(val_df):,} records ({len(val_df)/total*100:.2f}%)")
-    print(f"Test Set (2024)           : {len(test_df):,} records ({len(test_df)/total*100:.2f}%)")
-    print(f"Total Partitioned Rows    : {len(train_df) + len(val_df) + len(test_df):,}")
 
     return train_df, val_df, test_df
 
@@ -697,10 +574,6 @@ def prepare_classical_and_quantum_features(train_df, val_df, test_df, full_df):
     Returns:
         tuple: (train_df, val_df, test_df, full_df, feature_cols, top_8, top_16, importances)
     """
-    print("\n" + "=" * 80)
-    print("STEP 9: FEATURE ENCODING, SCALING & QUANTUM PREPARATION")
-    print("=" * 80)
-
     cat_cols = ['market', 'district', 'state', 'variety', 'crop_season_onion']
     for col in cat_cols:
         freq_map = train_df[col].value_counts(normalize=True).to_dict()
@@ -742,7 +615,6 @@ def prepare_classical_and_quantum_features(train_df, val_df, test_df, full_df):
     test_df[angle_feature_cols] = angle_scaler.transform(test_df[feature_cols])
     full_df[angle_feature_cols] = angle_scaler.transform(full_df[feature_cols])
 
-    print("Evaluating feature importance via Random Forest on training partition...")
     sample_sub = train_df.sample(n=min(10000, len(train_df)), random_state=RANDOM_SEED)
     rf = RandomForestRegressor(n_estimators=50, max_depth=12, random_state=RANDOM_SEED, n_jobs=-1)
     rf.fit(sample_sub[feature_cols], sample_sub['target_price_next_month'])
@@ -751,14 +623,6 @@ def prepare_classical_and_quantum_features(train_df, val_df, test_df, full_df):
 
     top_8_quantum = importances.head(8).index.tolist()
     top_16_quantum = importances.head(16).index.tolist()
-
-    print("\nTop 8 Features for 8-Qubit Circuits:")
-    for rank, feat in enumerate(top_8_quantum, 1):
-        print(f"  {rank:>2}. {feat:<32} (Importance: {importances[feat]:.4f})")
-
-    print("\nTop 16 Features for 16-Qubit Circuits:")
-    for rank, feat in enumerate(top_16_quantum, 1):
-        print(f"  {rank:>2}. {feat:<32} (Importance: {importances[feat]:.4f})")
 
     return train_df, val_df, test_df, full_df, feature_cols, top_8_quantum, top_16_quantum, importances
 
@@ -848,7 +712,6 @@ def save_feature_descriptions(feature_cols, top_8, top_16, base_dir):
     desc_df = pd.DataFrame(rows)
     desc_path = os.path.join(base_dir, "feature_description.csv")
     desc_df.to_csv(desc_path, index=False)
-    print(f"Feature description file saved: {desc_path}")
     return desc_df
 
 
@@ -878,10 +741,6 @@ def generate_visualizations(raw_df, clean_daily_df, monthly_df, train_df, val_df
         viz_dir (str): Visualization output directory.
         feature_cols (list): List of model feature names.
     """
-    print("\n" + "=" * 80)
-    print("STEP 10: GENERATING DIAGNOSTIC VISUALIZATIONS")
-    print("=" * 80)
-
     # 1. Target Distribution
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
     sns.histplot(raw_df['modal_price_rs_qtl'], bins=60, kde=True, ax=axes[0], color='#d95f02', edgecolor='black', alpha=0.6)
@@ -1080,55 +939,6 @@ def generate_visualizations(raw_df, clean_daily_df, monthly_df, train_df, val_df
     plt.savefig(os.path.join(viz_dir, "10_training_price_sample_weights.png"), dpi=300)
     plt.close()
 
-    print(f"Figures saved to: {viz_dir}")
-
-
-def display_before_after_comparison(metrics_before, clean_daily_df, monthly_df, feature_cols):
-    """
-    Format and display before-and-after preprocessing comparison table.
-
-    Args:
-        metrics_before (dict): Baseline metrics.
-        clean_daily_df (pd.DataFrame): Clean daily dataframe.
-        monthly_df (pd.DataFrame): Final monthly dataframe.
-        feature_cols (list): List of feature column names.
-    """
-    print("\n" + "=" * 80)
-    print("STEP 11: PREPROCESSING COMPARISON AUDIT")
-    print("=" * 80)
-
-    target_after = monthly_df['target_price_next_month']
-    q25_after = target_after.quantile(0.25)
-    q50_after = target_after.median()
-    q75_after = target_after.quantile(0.75)
-    iqr_after = q75_after - q25_after
-    iqr_outliers_after = ((target_after < (q25_after - 1.5 * iqr_after)) | (target_after > (q75_after + 1.5 * iqr_after))).sum()
-
-    exact_dups_after = monthly_df.duplicated(subset=['state', 'district', 'market', 'variety', 'year', 'month']).sum()
-    missing_after = monthly_df[feature_cols + ['target_price_next_month']].isna().sum().sum()
-
-    comparison_data = [
-        {"Metric": "Dataset Row Count", "Before": f"{metrics_before['rows']:,}", "After": f"{len(monthly_df):,}", "Change": f"Aggregated to {len(monthly_df):,} monthly units"},
-        {"Metric": "Feature / Column Count", "Before": f"{metrics_before['cols']}", "After": f"{len(feature_cols)} features + Target", "Change": "Engineered & selected"},
-        {"Metric": "Missing Values in Model Features", "Before": f"{metrics_before['missing_values']:,}", "After": f"{missing_after}", "Change": "-100.0% (Clean)"},
-        {"Metric": "Exact Duplicate Records", "Before": f"{metrics_before['exact_duplicates']:,}", "After": f"{exact_dups_after}", "Change": "0 duplicates"},
-        {"Metric": "Invalid / Zero Target Prices", "Before": f"{metrics_before['invalid_prices']:,}", "After": "0", "Change": "Imputed or removed"},
-        {"Metric": "Severe Scale Typo Errors (>25k)", "Before": f"{metrics_before['extreme_errors']:,}", "After": "0", "Change": "Filtered"},
-        {"Metric": "Target Price Mean (Rs/qtl)", "Before": f"Rs {metrics_before['target_mean']:.2f}", "After": f"Rs {target_after.mean():.2f}", "Change": f"{target_after.mean() - metrics_before['target_mean']:+.2f} Rs/qtl"},
-        {"Metric": "Target Price Median (Rs/qtl)", "Before": f"Rs {metrics_before['target_median']:.2f}", "After": f"Rs {q50_after:.2f}", "Change": f"{q50_after - metrics_before['target_median']:+.2f} Rs/qtl"},
-        {"Metric": "Target Price Std Dev (Rs/qtl)", "Before": f"Rs {metrics_before['target_std']:.2f}", "After": f"Rs {target_after.std():.2f}", "Change": "Robust empirical volatility"},
-        {"Metric": "Target Maximum Price (Rs/qtl)", "Before": f"Rs {metrics_before['target_max']:.2f}", "After": f"Rs {target_after.max():.2f}", "Change": "Genuine crisis spike retained"},
-        {"Metric": "Statistical IQR Outliers (1.5x)", "Before": f"{metrics_before['iqr_outliers']:,} ({metrics_before['iqr_outliers']/metrics_before['rows']*100:.1f}%)", "After": f"{iqr_outliers_after:,} ({iqr_outliers_after/len(monthly_df)*100:.1f}%)", "Change": "Genuine agricultural spikes"},
-        {"Metric": "Wholesale Markets Retained", "Before": f"{metrics_before['markets']}", "After": f"{monthly_df['market'].nunique()}", "Change": f"{monthly_df['market'].nunique()} markets"},
-        {"Metric": "Districts Retained", "Before": f"{metrics_before['districts']}", "After": f"{monthly_df['district'].nunique()}", "Change": f"{monthly_df['district'].nunique()} districts"},
-        {"Metric": "Varieties Retained", "Before": f"{metrics_before['varieties']}", "After": f"{monthly_df['variety'].nunique()}", "Change": f"{monthly_df['variety'].nunique()} cultivars"}
-    ]
-
-    comp_df = pd.DataFrame(comparison_data)
-    pd.set_option('display.max_columns', 5)
-    pd.set_option('display.width', 1000)
-    print("\n" + comp_df.to_string(index=False))
-
 
 def export_processed_files(full_monthly_df, train_df, val_df, test_df, base_dir):
     """
@@ -1144,25 +954,14 @@ def export_processed_files(full_monthly_df, train_df, val_df, test_df, base_dir)
     Returns:
         tuple: File paths of generated CSV files.
     """
-    print("\n" + "=" * 80)
-    print("STEP 12: EXPORTING PROCESSED DATASETS")
-    print("=" * 80)
-
     monthly_path = os.path.join(base_dir, "cleaned_onion_monthly.csv")
     train_path = os.path.join(base_dir, "train.csv")
     val_path = os.path.join(base_dir, "validation.csv")
     test_path = os.path.join(base_dir, "test.csv")
 
-    print(f"Exporting monthly dataset: {monthly_path}")
     full_monthly_df.to_csv(monthly_path, index=False)
-
-    print(f"Exporting training partition (2014-2021): {train_path}")
     train_df.to_csv(train_path, index=False)
-
-    print(f"Exporting validation partition (2022-2023): {val_path}")
     val_df.to_csv(val_path, index=False)
-
-    print(f"Exporting test partition (2024): {test_path}")
     test_df.to_csv(test_path, index=False)
 
     return monthly_path, train_path, val_path, test_path
@@ -1248,12 +1047,11 @@ python preprocessing.py
 """
     with open(readme_path, 'w', encoding='utf-8') as f:
         f.write(content.strip())
-    print(f"Documentation saved: {readme_path}")
 
 
-def print_final_summary(metrics_before, clean_daily_df, monthly_df, train_df, val_df, test_df, feature_cols, base_dir, viz_dir):
+def print_summary(metrics_before, clean_daily_df, monthly_df, train_df, val_df, test_df, feature_cols, base_dir, viz_dir):
     """
-    Print console summary of pipeline execution metrics.
+    Print formal execution summary and output metrics to console.
 
     Args:
         metrics_before (dict): Raw baseline metrics.
@@ -1266,62 +1064,74 @@ def print_final_summary(metrics_before, clean_daily_df, monthly_df, train_df, va
         base_dir (str): Base directory.
         viz_dir (str): Visualizations directory.
     """
-    print("\n" + "=" * 80)
-    print("STEP 13: PREPROCESSING SUMMARY")
-    print("=" * 80)
+    target = monthly_df['target_price_next_month']
+    total_monthly = len(monthly_df)
 
-    print(f"1.  Original Dataset Size       : {metrics_before['rows']:,} rows, {metrics_before['cols']} columns")
-    print(f"2.  Cleaned Daily Dataset Size  : {len(clean_daily_df):,} rows ({len(clean_daily_df)/metrics_before['rows']*100:.2f}% retained)")
-    print(f"3.  Final Monthly Dataset Size  : {len(monthly_df):,} monthly prediction units")
-    print(f"4.  Selected Feature Count      : {len(feature_cols)} input features + Target (P_{{t+1}})")
-    print(f"5.  Missing Values Handled      : 100% resolved (0 missing values remaining)")
-    print(f"6.  Duplicate Records Handled   : Key duplicates resolved; 0 duplicates in monthly dataset")
-    print(f"7.  Invalid Records Handled     : 442 zero modal prices (239 imputed, 203 invalid dropped)")
-    print(f"8.  Scale Typo Errors Filtered  : {metrics_before['extreme_errors']} extreme typo errors (> Rs 25,000/qtl)")
-    print(f"9.  Balancing Strategy Applied  : Inverse-frequency sample weighting on training loss")
-    print(f"10. Chronological Split Sizes   :")
-    print(f"    - Training Set (2014-2021)  : {len(train_df):,} samples ({len(train_df)/len(monthly_df)*100:.2f}%)")
-    print(f"    - Validation Set (2022-2023): {len(val_df):,} samples ({len(val_df)/len(monthly_df)*100:.2f}%)")
-    print(f"    - Test Set (2024)           : {len(test_df):,} samples ({len(test_df)/len(monthly_df)*100:.2f}%)")
-    print(f"11. Primary Target Variable     : target_price_next_month (Rs/qtl)")
-    print(f"12. Output Files                :")
-    print(f"    - Cleaned Monthly CSV       : {os.path.join(base_dir, 'cleaned_onion_monthly.csv')}")
-    print(f"    - Train CSV Split           : {os.path.join(base_dir, 'train.csv')}")
-    print(f"    - Validation CSV Split      : {os.path.join(base_dir, 'validation.csv')}")
-    print(f"    - Test CSV Split            : {os.path.join(base_dir, 'test.csv')}")
-    print(f"    - Column Audit Report CSV   : {os.path.join(base_dir, 'preprocessing_report.csv')}")
-    print(f"    - Feature Dictionary CSV    : {os.path.join(base_dir, 'feature_description.csv')}")
-    print(f"    - Preprocessing Script      : {os.path.join(base_dir, 'preprocessing.py')}")
-    print(f"    - Documentation             : {os.path.join(base_dir, 'README.md')}")
-    print(f"    - Visualizations            : {viz_dir}")
+    print("\n" + "=" * 80)
+    print("PREPROCESSING RESULTS")
     print("=" * 80)
-    print("Pipeline execution completed successfully.")
+    print("Dataset Records:")
+    print(f"  Raw observations          : {metrics_before['rows']:,} daily records ({metrics_before['cols']} columns)")
+    print(f"  Cleaned daily records     : {len(clean_daily_df):,} daily records ({len(clean_daily_df)/metrics_before['rows']*100:.2f}% retained)")
+    print(f"  Monthly forecasting units : {total_monthly:,} records")
+    print(f"  Model features            : {len(feature_cols)} numerical predictors + 1 target")
+    print(f"  Missing values            : 0")
+
+    print("\nChronological Partitions:")
+    print(f"  Train (2014-2021)         : {len(train_df):,} samples ({len(train_df)/total_monthly*100:.2f}%)")
+    print(f"  Validation (2022-2023)    : {len(val_df):,} samples ({len(val_df)/total_monthly*100:.2f}%)")
+    print(f"  Test (2024)               : {len(test_df):,} samples ({len(test_df)/total_monthly*100:.2f}%)")
+
+    print("\nTarget Variable:")
+    print("  Name                      : target_price_next_month (P_{t+1})")
+    print("  Unit                      : Rupees per Quintal (Rs/qtl)")
+    print(f"  Mean / Median             : Rs {target.mean():.2f} / Rs {target.median():.2f}")
+    print(f"  Std Dev                   : Rs {target.std():.2f}")
+
+    print("\nOutput Files Generated:")
+    print(f"  - {os.path.join(base_dir, 'cleaned_onion_monthly.csv')}")
+    print(f"  - {os.path.join(base_dir, 'train.csv')}")
+    print(f"  - {os.path.join(base_dir, 'validation.csv')}")
+    print(f"  - {os.path.join(base_dir, 'test.csv')}")
+    print(f"  - {os.path.join(base_dir, 'preprocessing_report.csv')}")
+    print(f"  - {os.path.join(base_dir, 'feature_description.csv')}")
+    print(f"  - {os.path.join(base_dir, 'README.md')}")
+    print(f"  - {viz_dir} (10 figures)")
     print("=" * 80 + "\n")
 
 
 def main():
-    print("\n" + "#" * 80)
-    print("  CROP MARKET PRICE PREDICTION - DATA PREPROCESSING PIPELINE")
-    print("#" * 80)
-
+    print("Executing onion price prediction preprocessing pipeline...")
     base_dir, csv_path, zip_path, viz_dir = resolve_data_paths()
+
+    print("[1/6] Ingesting raw dataset...")
     raw_df = load_raw_dataset(csv_path, zip_path)
     metrics_before = profile_baseline_dataset(raw_df)
-    generate_feature_classification_report(raw_df, base_dir)
+
+    print("[2/6] Cleaning observations and handling anomalies...")
     clean_daily_df, cleaning_ledger = clean_daily_dataset(raw_df)
+    generate_feature_classification_report(raw_df, base_dir)
+
+    print("[3/6] Aggregating monthly series and constructing targets...")
     monthly_df = aggregate_to_monthly_dataset(clean_daily_df)
+
+    print("[4/6] Engineering time-aware features and sample weights...")
     monthly_df = engineer_monthly_features(monthly_df)
     monthly_df, tier_df, imbalance_ratio = perform_imbalance_analysis(monthly_df)
     train_df, val_df, test_df = split_chronologically(monthly_df)
+
+    print("[5/6] Encoding features and scaling for classical / QML models...")
     train_df, val_df, test_df, monthly_df, feature_cols, top_8, top_16, importances = prepare_classical_and_quantum_features(
         train_df, val_df, test_df, monthly_df
     )
     save_feature_descriptions(feature_cols, top_8, top_16, base_dir)
+
+    print("[6/6] Generating visualizations and exporting output files...")
     generate_visualizations(raw_df, clean_daily_df, monthly_df, train_df, val_df, test_df, viz_dir, feature_cols)
     export_processed_files(monthly_df, train_df, val_df, test_df, base_dir)
     generate_readme(base_dir, monthly_df, train_df, val_df, test_df, top_8, top_16)
-    display_before_after_comparison(metrics_before, clean_daily_df, monthly_df, feature_cols)
-    print_final_summary(metrics_before, clean_daily_df, monthly_df, train_df, val_df, test_df, feature_cols, base_dir, viz_dir)
+
+    print_summary(metrics_before, clean_daily_df, monthly_df, train_df, val_df, test_df, feature_cols, base_dir, viz_dir)
 
 
 if __name__ == '__main__':

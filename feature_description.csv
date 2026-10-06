@@ -37,4 +37,4 @@ state_encoded,float64,Frequency encoding of state,Macro state production share r
 variety_encoded,float64,Frequency encoding of onion cultivar,Cultivar prevalence & market share,No,No
 crop_season_onion_encoded,float64,Frequency encoding of crop season (Rabi/Kharif),Agricultural crop production cycle encoding,No,No
 target_price_next_month,float64,Monthly average modal price in consecutive month t+1 (Rs/qtl),Supervised Regression Target (P_{t+1}),Target,Target
-sample_weight,float64,Inverse-frequency tier weight for training regression loss,Loss Penalty Weighting (No row distortion),Weight,Weight
+sample_weight,float64,Inverse-frequency tier weight for training regression loss,Loss Penalty Weighting,Weight,Weight
